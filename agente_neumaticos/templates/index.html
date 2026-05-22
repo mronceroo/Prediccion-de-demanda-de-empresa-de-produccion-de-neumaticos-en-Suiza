@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agente de Análisis — Neumáticos Suiza</title>
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.27.0/plotly.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f0f0eb;
+  color: #1a1a1a;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.header {
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.header-left h1 { font-size: 15px; font-weight: 600; }
+.header-left p  { font-size: 11px; color: #888; margin-top: 1px; }
+.badge {
+  font-size: 10px; padding: 2px 8px; border-radius: 20px;
+  background: #e8f0fe; color: #1a56db; font-weight: 500;
+}
+.btn-reset {
+  font-size: 12px; padding: 5px 12px; border-radius: 6px;
+  border: 1px solid #ddd; background: #fff; color: #555;
+  cursor: pointer;
+}
+.btn-reset:hover { background: #f5f5f5; }
+
+/* Main layout */
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* Panel izquierdo — chat */
+.panel-chat {
+  width: 400px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  background: #fff; border-right: 1px solid #e0e0e0;
+}
+
+/* Stats */
+.stats {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 7px; padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+.stat { background: #f8f9fa; border-radius: 8px; padding: 7px 10px; }
+.stat .label { font-size: 10px; color: #888; margin-bottom: 1px; }
+.stat .value { font-size: 13px; font-weight: 600; }
+
+/* Suggestions */
+.suggestions {
+  padding: 8px 10px; border-bottom: 1px solid #eee;
+  display: flex; flex-wrap: wrap; gap: 5px;
+}
+.suggestion {
+  font-size: 11px; padding: 3px 9px; border-radius: 16px;
+  border: 1px solid #ddd; background: #fff; color: #555;
+  cursor: pointer; transition: all 0.12s;
+}
+.suggestion:hover { background: #e8f0fe; border-color: #1a56db; color: #1a56db; }
+
+/* Messages */
+.messages {
+  flex: 1; overflow-y: auto; padding: 10px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.msg { display: flex; gap: 8px; align-items: flex-start; }
+.msg.user { flex-direction: row-reverse; }
+.avatar {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; flex-shrink: 0;
+}
+.avatar.ai   { background: #e8f0fe; color: #1a56db; }
+.avatar.user { background: #f0f0f0; color: #666; }
+.bubble {
+  max-width: 84%; padding: 8px 11px; border-radius: 10px;
+  font-size: 13px; line-height: 1.6; white-space: pre-wrap;
+}
+.bubble.ai     { background: #f8f9fa; border: 1px solid #eee; }
+.bubble.user   { background: #1a56db; color: #fff; }
+.bubble.loading{ color: #aaa; font-style: italic; background: #f8f9fa; border: 1px solid #eee; }
+.bubble.error  { background: #fff5f5; border: 1px solid #fcc; color: #c0392b; }
+
+/* Input */
+.input-area {
+  border-top: 1px solid #eee; padding: 9px 10px;
+  display: flex; gap: 7px; align-items: center;
+}
+.input-area input {
+  flex: 1; font-size: 13px; border: 1px solid #ddd; border-radius: 8px;
+  padding: 7px 11px; background: #fafafa; color: #1a1a1a; outline: none;
+}
+.input-area input:focus { border-color: #1a56db; background: #fff; }
+.input-area button {
+  padding: 7px 14px; font-size: 13px; font-weight: 500;
+  border-radius: 8px; cursor: pointer; border: none;
+  background: #1a56db; color: #fff;
+}
+.input-area button:disabled { background: #aaa; cursor: not-allowed; }
+
+/* Panel derecho */
+.panel-derecho {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+}
+
+/* Tabs */
+.tabs {
+  display: flex; background: #fff;
+  border-bottom: 1px solid #e0e0e0; flex-shrink: 0;
+}
+.tab {
+  padding: 10px 18px; font-size: 13px; font-weight: 500;
+  color: #888; cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all 0.15s; white-space: nowrap;
+}
+.tab:hover { color: #1a56db; }
+.tab.active { color: #1a56db; border-bottom-color: #1a56db; }
+
+/* Toolbar de gráficas */
+.graficas-toolbar {
+  padding: 8px 12px; background: #fff;
+  border-bottom: 1px solid #eee;
+  display: flex; flex-wrap: wrap; gap: 5px;
+  flex-shrink: 0;
+}
+.btn-grafica {
+  font-size: 11px; padding: 4px 9px; border-radius: 6px;
+  border: 1px solid #ddd; background: #fff; color: #555;
+  cursor: pointer; transition: all 0.12s;
+}
+.btn-grafica:hover  { background: #f0f4ff; border-color: #1a56db; color: #1a56db; }
+.btn-grafica.active { background: #1a56db; border-color: #1a56db; color: #fff; }
+
+/* Contenido de paneles */
+.panel-content {
+  flex: 1; overflow: hidden; position: relative;
+}
+.panel-content > div { 
+  position: absolute; inset: 0; 
+  display: none; 
+}
+.panel-content > div.visible { display: flex; flex-direction: column; }
+
+/* Tableau iframe */
+#tablaeuPanel {
+  background: #f0f0eb;
+}
+#tableauIframe {
+  flex: 1; border: none; width: 100%; height: 100%;
+}
+.tableau-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: #f0f0eb; flex-direction: column; gap: 12px;
+  color: #888; font-size: 13px;
+}
+
+/* Gráficas Plotly */
+#graficasPanel { background: #f0f0eb; }
+.grafica-wrap {
+  flex: 1; padding: 12px; overflow-y: auto;
+}
+.grafica-box {
+  background: #fff; border-radius: 10px; border: 1px solid #e0e0e0;
+  padding: 12px; min-height: 400px;
+  display: flex; align-items: center; justify-content: center;
+}
+.placeholder {
+  text-align: center; color: #bbb;
+}
+#plotDiv { width: 100%; }
+
+/* Pill recomendación */
+.rec-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; padding: 3px 9px; border-radius: 12px;
+  background: #e8f0fe; color: #1a56db; cursor: pointer;
+  border: 1px solid #c0d3fb; margin-top: 6px; transition: background 0.12s;
+}
+.rec-pill:hover { background: #c0d3fb; }
+.tableau-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; padding: 3px 9px; border-radius: 12px;
+  background: #e6f7ee; color: #1a7a42; cursor: pointer;
+  border: 1px solid #b3e0c8; margin-top: 6px; transition: background 0.12s;
+}
+.tableau-pill:hover { background: #b3e0c8; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>Agente de Análisis — Demanda de Neumáticos en Suiza</h1>
+    <p>TFG · SDG Group · Predicciones 2026-2027</p>
+  </div>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <span class="badge">Claude Sonnet 4 + Tableau Public</span>
+    <button class="btn-reset" onclick="resetChat()">↺ Nueva conversación</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- Panel izquierdo: chat -->
+  <div class="panel-chat">
+    <div class="stats">
+      <div class="stat">
+        <div class="label">Total predicho · Suiza</div>
+        <div class="value">320.309 uds</div>
+      </div>
+      <div class="stat">
+        <div class="label">MAPE global / grandes</div>
+        <div class="value">59,9% / 28,8%</div>
+      </div>
+      <div class="stat">
+        <div class="label">Cantones &lt; umbral 50%</div>
+        <div class="value">20 de 26</div>
+      </div>
+      <div class="stat">
+        <div class="label">Modelos en ensemble</div>
+        <div class="value">6 modelos</div>
+      </div>
+    </div>
+
+    <div class="suggestions">
+      <span class="suggestion" onclick="fillQ('¿Qué modelo se usa para Zürich y por qué?')">Zürich</span>
+      <span class="suggestion" onclick="fillQ('¿Son fiables las predicciones para Uri?')">Uri — fiabilidad</span>
+      <span class="suggestion" onclick="fillQ('¿Cuál es la predicción para Vaud?')">Predicción Vaud</span>
+      <span class="suggestion" onclick="fillQ('¿Qué cantones tienen mejor precisión?')">Ranking fiabilidad</span>
+      <span class="suggestion" onclick="fillQ('¿Por qué Solothurn tiene tanta demanda predicha?')">Efecto Solothurn</span>
+      <span class="suggestion" onclick="fillQ('Resume los resultados globales del modelo')">Resumen global</span>
+      <span class="suggestion" onclick="fillQ('¿Qué tendencias de producto se observan en Suiza?')">Tendencias mercado</span>
+      <span class="suggestion" onclick="fillQ('¿Qué ventajas tiene la optimización bayesiana sobre el grid search?')">Bayes vs GridSearch</span>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="msg">
+        <div class="avatar ai">AI</div>
+        <div class="bubble ai">Hola, soy el asistente de análisis del proyecto de predicción de demanda de neumáticos en Suiza. Tengo acceso al dashboard de Tableau y puedo generar gráficas adicionales. ¿Qué quieres analizar?</div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <input type="text" id="userInput"
+        placeholder="Pregunta sobre cantón, modelo o predicción..."
+        onkeydown="if(event.key==='Enter')sendMsg()" />
+      <button onclick="sendMsg()" id="sendBtn">Enviar</button>
+    </div>
+  </div>
+
+  <!-- Panel derecho -->
+  <div class="panel-derecho">
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab active" id="tab-tableau" onclick="switchTab('tableau')">
+        📊 Dashboard Tableau
+      </div>
+      <div class="tab" id="tab-graficas" onclick="switchTab('graficas')">
+        📈 Gráficas de análisis
+      </div>
+    </div>
+
+    <!-- Toolbar gráficas (solo visible en pestaña graficas) -->
+    <div class="graficas-toolbar" id="graficasToolbar" style="display:none;">
+      <button class="btn-grafica" onclick="cargarGrafica('mape_canton')">MAPE por cantón</button>
+      <button class="btn-grafica" onclick="cargarGrafica('predicciones_canton')">Predicciones</button>
+      <button class="btn-grafica" onclick="cargarGrafica('mapa_predicciones')">Mapa predicciones</button>
+      <button class="btn-grafica" onclick="cargarGrafica('mapa_mape')">Mapa MAPE</button>
+      <button class="btn-grafica" onclick="cargarGrafica('evolucion_modelos')">Evolución modelos</button>
+      <button class="btn-grafica" onclick="cargarGrafica('feature_importance')">Features</button>
+      <button class="btn-grafica" onclick="cargarGrafica('distribucion_modelos')">Distribución</button>
+    </div>
+
+    <!-- Contenido de paneles -->
+    <div class="panel-content">
+
+      <!-- Tableau -->
+      <div id="tablaeuPanel" class="visible">
+        <div id="tableauLoading" class="tableau-overlay">
+          <span style="font-size:32px;">📊</span>
+          <span>Cargando dashboard de Tableau Public...</span>
+        </div>
+        <iframe
+          id="tableauIframe"
+          src="https://public.tableau.com/views/Exposicion_resultados_TFG/Dashboard_Principal?:embed=y&:showVizHome=no&:toolbar=yes&:tabs=no"
+          onload="document.getElementById('tableauLoading').style.display='none'"
+          allowfullscreen>
+        </iframe>
+      </div>
+
+      <!-- Gráficas Plotly -->
+      <div id="graficasPanel">
+        <div class="grafica-wrap">
+          <div class="grafica-box" id="graficaBox">
+            <div class="placeholder">
+              <span style="font-size:36px;">📈</span>
+              <p style="margin-top:8px;font-size:13px;">Selecciona una gráfica o haz una pregunta<br>y el agente recomendará la más relevante</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Tab switching ----
+function switchTab(tab) {
+  document.getElementById('tablaeuPanel').classList.remove('visible');
+  document.getElementById('graficasPanel').classList.remove('visible');
+  document.getElementById('tab-tableau').classList.remove('active');
+  document.getElementById('tab-graficas').classList.remove('active');
+  document.getElementById('graficasToolbar').style.display = 'none';
+
+  if (tab === 'tableau') {
+    document.getElementById('tablaeuPanel').classList.add('visible');
+    document.getElementById('tab-tableau').classList.add('active');
+  } else {
+    document.getElementById('graficasPanel').classList.add('visible');
+    document.getElementById('tab-graficas').classList.add('active');
+    document.getElementById('graficasToolbar').style.display = 'flex';
+  }
+}
+
+// ---- Chat ----
+function fillQ(text) {
+  document.getElementById('userInput').value = text;
+  document.getElementById('userInput').focus();
+}
+
+function addMsg(role, content, cls) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg' + (role === 'user' ? ' user' : '');
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar ' + (role === 'user' ? 'user' : 'ai');
+  avatar.textContent = role === 'user' ? 'TÚ' : 'AI';
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble ' + (cls || (role === 'user' ? 'user' : 'ai'));
+  bubble.innerHTML = content;
+  div.appendChild(avatar);
+  div.appendChild(bubble);
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return bubble;
+}
+
+// ---- Gráficas Plotly ----
+function renderGrafica(figData, nombre) {
+  const box = document.getElementById('graficaBox');
+  box.innerHTML = '<div id="plotDiv"></div>';
+  document.querySelectorAll('.btn-grafica').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.btn-grafica').forEach(b => {
+    if (b.onclick && b.onclick.toString().includes(nombre)) b.classList.add('active');
+  });
+  const layout = {
+    ...figData.layout,
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    autosize: true,
+    height: Math.max(380, document.getElementById('graficaBox').clientHeight - 30),
+  };
+  Plotly.newPlot('plotDiv', figData.data, layout, {
+    responsive: true, displayModeBar: true,
+    modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+  });
+  // Cambiar a pestaña de gráficas automáticamente
+  switchTab('graficas');
+}
+
+async function cargarGrafica(nombre) {
+  switchTab('graficas');
+  const box = document.getElementById('graficaBox');
+  box.innerHTML = '<div style="text-align:center;padding:2rem;color:#aaa;">Cargando gráfica...</div>';
+  try {
+    const res = await fetch('/grafica/' + nombre);
+    const data = await res.json();
+    if (data.grafica) renderGrafica(data.grafica, nombre);
+  } catch(e) {
+    box.innerHTML = '<div style="color:#c0392b;padding:1rem;">Error al cargar la gráfica.</div>';
+  }
+}
+
+// ---- Envío de mensajes ----
+async function sendMsg() {
+  const input = document.getElementById('userInput');
+  const btn = document.getElementById('sendBtn');
+  const texto = input.value.trim();
+  if (!texto) return;
+
+  addMsg('user', texto);
+  input.value = '';
+  btn.disabled = true;
+  const loadBubble = addMsg('ai', 'Analizando...', 'loading');
+
+  try {
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mensaje: texto }),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      loadBubble.textContent = 'Error: ' + data.error;
+      loadBubble.className = 'bubble error';
+    } else {
+      let html = data.respuesta.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+      // Añadir píldora de gráfica Plotly si hay recomendación
+      if (data.nombre_grafica) {
+        html += `<br><span class="rec-pill" onclick="cargarGrafica('${data.nombre_grafica}')">
+          📈 Ver gráfica de análisis
+        </span>`;
+      }
+
+      // Añadir siempre píldora para ir al dashboard de Tableau
+      html += `<br><span class="tableau-pill" onclick="switchTab('tableau')">
+        📊 Ver en dashboard Tableau
+      </span>`;
+
+      loadBubble.innerHTML = html;
+      loadBubble.className = 'bubble ai';
+
+      // Cargar gráfica Plotly si hay recomendación
+      if (data.grafica) renderGrafica(data.grafica, data.nombre_grafica);
+    }
+  } catch(e) {
+    loadBubble.textContent = 'Error de conexión con Flask.';
+    loadBubble.className = 'bubble error';
+  }
+
+  btn.disabled = false;
+  input.focus();
+}
+
+// ---- Reset ----
+async function resetChat() {
+  await fetch('/reset', { method: 'POST' });
+  const msgs = document.getElementById('messages');
+  msgs.innerHTML = `<div class="msg">
+    <div class="avatar ai">AI</div>
+    <div class="bubble ai">Conversación reiniciada. ¿En qué puedo ayudarte?</div>
+  </div>`;
+}
+</script>
+</body>
+</html>
